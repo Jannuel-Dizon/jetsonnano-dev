@@ -1,5 +1,5 @@
-cmake_minimum_required(VERSION 3.20.0)
+cmake_minimum_required(VERSION 3.18)
+project(HelloWorld LANGUAGES CXX CUDA)
 
-project(HelloWorld)
-
-target_sources(src/main.cpp)
+add_subdirectory(components)
+add_subdirectory(main)
