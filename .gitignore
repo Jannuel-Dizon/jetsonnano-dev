@@ -1,0 +1,20 @@
+# Ignore build output directories
+build/
+/build/
+
+# Ignore temporary cache folders
+.cache/
+/.cache/
+
+# Ignore generated configuration files that are specific to your machine
+sdkconfig
+
+# Ignore compiled binary files
+*.elf
+*.bin
+*.map
+
+# Ignore common editor and temporary files
+.vscode/
+*.bak
+*.swp
