@@ -12,9 +12,9 @@ MyLA::Matrix<T, ROWS, COLS>(T defaultVal) {
 // COLS = x
 template <typename T, int A_ROWS, int A_COLS>
 template <int B_ROWS, int B_COLS>
-Matrix<T, A_ROWS, A_COLS> Matrix<T, A_ROWS, A_COLS>::operator+(const Matrix<T, B_ROWS, B_COLS>& hostB) {
+MyLA::Matrix<T, A_ROWS, A_COLS> MyLA::Matrix<T, A_ROWS, A_COLS>::operator+(const Matrix<T, B_ROWS, B_COLS>& hostB) const {
     assert(A_ROWS == B_ROWS && A_COLS == B_COLS);
-    Matrix<T, A_ROWS, A_COLS> hostC;
+    MyLA::Matrix<T, A_ROWS, A_COLS> hostC;
     T* devA;
     T* devB;
     T* devC;
@@ -80,9 +80,9 @@ __global__ void matAddKernel(T* devA, T* devB, T* devC, int rows, int cols) {
 
 template<typename T, int A_ROWS, int A_COLS>
 template<int B_ROWS, int B_COLS>
-Matrix<T, A_ROWS, B_COLS> Matrix<T, A_ROWS, A_COLS>::operator*(const Matrix<T, B_ROWS, B_COLS>& hostB) {
+MyLA::Matrix<T, A_ROWS, B_COLS> MyLA::Matrix<T, A_ROWS, A_COLS>::operator*(const Matrix<T, B_ROWS, B_COLS>& hostB) const {
     assert(A_COLS == B_COLS);
-    Matrix<T, A_ROWS, B_COLS> hostC;
+    MyLA::Matrix<T, A_ROWS, B_COLS> hostC;
     T* devA;
     T* devB;
     T* devC;
