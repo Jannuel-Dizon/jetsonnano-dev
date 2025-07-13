@@ -1,23 +1,24 @@
 #include "Matrix.h"
 #include <iostream>
 
-template <typename T, int ROWS, int COLS>
+template <typename T, int A_ROWS, int A_COLS>
 MyLA::Matrix<T, ROWS, COLS>(T defaultVal) {
-    for(int i = 0; i < ROWS*COLS; i++) {
+    for(int i = 0; i < A_ROWS*A_COLS; i++) {
         hostData[i] = defaultVal;
     }
 }
 
 // ROWS = y
 // COLS = x
-template <typename T, int ROWS, int COLS>
-Matrix<T, ROWS, COLS> Matrix<T, ROWS, COLS>::operator+(const Matrix<T, ROWS, COLS>& hostB) {
-    assert(this->getRows() == hostB.getRows() && this->getCols() == hostB.getCols());
-    Matrix<T, this->getRows(), this->getCols()> hostC;
+template <typename T, int A_ROWS, int A_COLS>
+template <int B_ROWS, int B_COLS>
+Matrix<T, A_ROWS, A_COLS> Matrix<T, A_ROWS, A_COLS>::operator+(const Matrix<T, B_ROWS, B_COLS>& hostB) {
+    assert(A_ROWS == B_ROWS && A_COLS == B_COLS);
+    Matrix<T, A_ROWS, A_COLS> hostC;
     T* devA;
     T* devB;
     T* devC;
-    size_t size = this->getRows()*this->getCols()*sizeof(T);
+    size_t size = A_ROWS*A_COLS*sizeof(T);
 
     cudaError_t error = cudaSuccess;
 
@@ -50,9 +51,9 @@ Matrix<T, ROWS, COLS> Matrix<T, ROWS, COLS>::operator+(const Matrix<T, ROWS, COL
     }
 
     dim3 threadsPerBlock(16, 16);
-    dim3 numBlocks((hostC.getCols()+threadsPerBlock.x-1)/threadsPerBlock.x, (hostC.getRows()+threadsPerBlock.y-1)/threadsPerBlock.y);
+    dim3 numBlocks((A_COLS+threadsPerBlock.x-1)/threadsPerBlock.x, (A_ROWS+threadsPerBlock.y-1)/threadsPerBlock.y);
 
-    matAddKernel<<<numBlocks, threadsPerBlock>>>(devA, devB, devC, hostC.getRows(), hostC.getCols());
+    matAddKernel<<<numBlocks, threadsPerBlock>>>(devA, devB, devC, A_ROWS, A_COLS);
 
     error = cudaMemcpy(hostC.getData(), devC, size, cudaMemcpyDeviceToHost);
     if(error != cudaSuccess) {
@@ -77,17 +78,17 @@ __global__ void matAddKernel(T* devA, T* devB, T* devC, int rows, int cols) {
     }
 }
 
-template<typename T, int ROWS, int COLS>
+template<typename T, int A_ROWS, int A_COLS>
 template<int B_ROWS, int B_COLS>
-Matrix<T, ROWS, B_COLS> Matrix<T, ROWS, COLS>::operator*(const Matrix<T, B_ROWS, B_COLS>& hostB) {
-    assert(this->getCols() == hostB.getRows());
-    Matrix<T, this->getRows(), hostB.getCols()> hostC;
+Matrix<T, A_ROWS, B_COLS> Matrix<T, A_ROWS, A_COLS>::operator*(const Matrix<T, B_ROWS, B_COLS>& hostB) {
+    assert(A_COLS == B_COLS);
+    Matrix<T, A_ROWS, B_COLS> hostC;
     T* devA;
     T* devB;
     T* devC;
-    size_t sizeA = this->getRows()*this->getCols()*sizeof(T);
-    size_t sizeB = hostB.getRows()*hostB.getCols()*sizeof(T);
-    size_t sizeC = hostC.getRows()*hostC.getCols()*sizeof(T);
+    size_t sizeA = A_ROWS*A_COLS*sizeof(T);
+    size_t sizeB = B_ROWS*B_COLS*sizeof(T);
+    size_t sizeC = A_ROWS*B_COLS*sizeof(T);
     cudaError_t error;
 
     error = cudaMalloc((void**)&devA, sizeA);
@@ -121,9 +122,9 @@ Matrix<T, ROWS, B_COLS> Matrix<T, ROWS, COLS>::operator*(const Matrix<T, B_ROWS,
     }
 
     dim3 threadsPerBlock(16, 16);
-    dim3 numBlocks((hostC.getCols()+threadsPerBlock.x-1)/threadsPerBlock.x, (hostC.getRows()+threadsPerBlock.y-1)/threadsPerBlock.y);
+    dim3 numBlocks((B_COLS+threadsPerBlock.x-1)/threadsPerBlock.x, (A_ROWS+threadsPerBlock.y-1)/threadsPerBlock.y);
 
-    matmatMulKernel<<<numBlocks, threadsPerBlock>>>(devA, devB, devC, this->getRows(), this->getCols(), hostB.getCols());
+    matmatMulKernel<<<numBlocks, threadsPerBlock>>>(devA, devB, devC, A_ROWS, A_COLS, B_COLS);
 
     error = cudaMemcpy(hostC.getData(), devC, sizeC, cudaMemcpyDeviceToHost);
     if(error != cudaSuccess) {
