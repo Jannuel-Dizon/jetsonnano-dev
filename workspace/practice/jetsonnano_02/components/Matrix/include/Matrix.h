@@ -6,7 +6,7 @@ namespace MyLA {
     __global__ void matAddKernel(T* devA, T* devB, T* devC, int rows, int cols);
 
     template <typename T>
-    __global__ void matmatMulKernel(T* devA, T* devB, T* devC, int rowsA, int colsAB, int rowsB);
+    __global__ void matmatMulKernel(T* devA, T* devB, T* devC, int rowsA, int colsrowsAB, int colsB);
 
     template <typename T>
     __global__ void matvecMulKernel(T* devA, T* devB, T* devC, int rows, int cols);
@@ -24,7 +24,7 @@ namespace MyLA {
             Matrix* ptrMatrix;
             int tRow;
         public:
-            tempRow(Matrix* tmpMatrix, int tmpRow) : prtMatrix(tmpMatrix), tRow(tmpRow) {}
+            tempRow(Matrix* tmpMatrix, int tmpRow) : ptrMatrix(tmpMatrix), tRow(tmpRow) {}
 
             T& operator[](int col) {
                 assert(col >= 0 && col < COLS);
@@ -36,9 +36,13 @@ namespace MyLA {
         Matrix<T, ROWS, COLS> operator+(const Matrix<T, ROWS, COLS>& hostB);
         template<int B_ROWS, int B_COLS>
         Matrix<T, ROWS, B_COLS> operator*(const Matrix<T, B_ROWS, B_COLS>& hostB);
-        Vector<T, SIZE> operator*(const Vector<T, SIZE>& hostB);
+        template<int SIZE>
+        Vector<T, ROWS> operator*(const Vector<T, SIZE>& hostB);
         void transpose();
-        tempRow operator[](int row);
+        tempRow operator[](int row) {
+            assert(row >= 0 && row < ROWS);
+            return tempRow(this, row);
+        }
         int getRows() const { return ROWS; }
         int getCols() const { return COLS; }
         const T* getData() const { return hostData; }

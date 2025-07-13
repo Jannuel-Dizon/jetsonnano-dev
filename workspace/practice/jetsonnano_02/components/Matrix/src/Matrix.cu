@@ -2,57 +2,63 @@
 #include <iostream>
 
 template <typename T, int ROWS, int COLS>
-Matrix<T, ROWS, COLS>(T defaultVal = 0) {
+MyLA::Matrix<T, ROWS, COLS>(T defaultVal) {
     for(int i = 0; i < ROWS*COLS; i++) {
         hostData[i] = defaultVal;
     }
 }
 
-template <typename T, int ROWS, int COLS>
-tempRow Matrix<T, ROWS, COLS>::operator[](int row) {
-    assert(row >= 0 && row < ROWS);
-    return tempRow(this, row);
-}
-
+// ROWS = y
+// COLS = x
 template <typename T, int ROWS, int COLS>
 Matrix<T, ROWS, COLS> Matrix<T, ROWS, COLS>::operator+(const Matrix<T, ROWS, COLS>& hostB) {
-    assert(ROWS == hostB.getRows() && COLS == hostB.getCols);
-    Matrix<T, ROWS, COLS> hostC;
+    assert(this->getRows() == hostB.getRows() && this->getCols() == hostB.getCols());
+    Matrix<T, this->getRows(), this->getCols()> hostC;
     T* devA;
     T* devB;
     T* devC;
-    size_t size = ROWS*COLS*sizeof(T);
+    size_t size = this->getRows()*this->getCols()*sizeof(T);
 
     cudaError_t error = cudaSuccess;
 
     error = cudaMalloc((void**)&devA, size);
     if(error != cudaSuccess) {
         std::cerr << "Failed to allocate devA for Matrix Addition" << std::endl;
-        return NULL->hostData;
+        throw std::runtime_error("Failed to allocate device memory.");
     }
     error = cudaMalloc((void**)&devB, size);
     if(error != cudaSuccess) {
         std::cerr << "Failed to allocate devB for Matrix Addition" << std::endl;
-        return NULL;
+        throw std::runtime_error("Failed to allocate device memory.");
     }
     error = cudaMalloc((void**)&devC, size);
     if(error != cudaSuccess) {
         std::cerr << "Failed to allocate devC for Matrix Addition" << std::endl;
-        return NULL;
+        throw std::runtime_error("Failed to allocate device memory.");
     }
 
-    error = cudaMemcpy(devA, this->hostData, size, cudaMemcpyHostToDevice);
+    error = cudaMemcpy(devA, this->getData(), size, cudaMemcpyHostToDevice);
     if(error != cudaSuccess) {
         std::cerr << "Failed to copy Matrix A from host to device" << std::endl;
-        return NULL;
+        throw std::runtime_error("Failed to copy host to device memory.");
     }
 
-    error = cudaMemcpy(devB, hostB.hostData, size, cudaMemcpyHostToDevice);
+    error = cudaMemcpy(devB, hostB.getData(), size, cudaMemcpyHostToDevice);
     if(error != cudaSuccess) {
         std::cerr << "Failed to copy Matrix B from host to device" << std::endl;
-        return NULL;
+        throw std::runtime_error("Failed to copy host to device memory.");
     }
 
+    dim3 threadsPerBlock(16, 16);
+    dim3 numBlocks((hostC.getCols()+threadsPerBlock.x-1)/threadsPerBlock.x, (hostC.getRows()+threadsPerBlock.y-1)/threadsPerBlock.y);
+
+    matAddKernel<<<numBlocks, threadsPerBlock>>>(devA, devB, devC, hostC.getRows(), hostC.getCols());
+
+    error = cudaMemcpy(hostC.getData(), devC, size, cudaMemcpyDeviceToHost);
+    if(error != cudaSuccess) {
+        std::cerr << "Failed to copy Matrix C from device to host" << std::endl;
+        throw std::runtime_error("Failed to copy device to host memory.");
+    }
 
     cudaFree(devA);
     cudaFree(devB);
@@ -61,8 +67,87 @@ Matrix<T, ROWS, COLS> Matrix<T, ROWS, COLS>::operator+(const Matrix<T, ROWS, COL
     return hostC;
 }
 
+template <typename T>
+__global__ void matAddKernel(T* devA, T* devB, T* devC, int rows, int cols) {
+    int row = (blockIdx.y * blockDim.y) + threadIdx.y;
+    int col = (blockIdx.x * blockDim.x) + threadIdx.x;
+    if(row < rows && col < cols) {
+        int index = (row*cols) + col;
+        devC[index] = devA[index] + devB[index];
+    }
+}
+
 template<typename T, int ROWS, int COLS>
 template<int B_ROWS, int B_COLS>
 Matrix<T, ROWS, B_COLS> Matrix<T, ROWS, COLS>::operator*(const Matrix<T, B_ROWS, B_COLS>& hostB) {
+    assert(this->getCols() == hostB.getRows());
+    Matrix<T, this->getRows(), hostB.getCols()> hostC;
+    T* devA;
+    T* devB;
+    T* devC;
+    size_t sizeA = this->getRows()*this->getCols()*sizeof(T);
+    size_t sizeB = hostB.getRows()*hostB.getCols()*sizeof(T);
+    size_t sizeC = hostC.getRows()*hostC.getCols()*sizeof(T);
+    cudaError_t error;
 
+    error = cudaMalloc((void**)&devA, sizeA);
+    if(error != cudaSuccess) {
+        std::cerr << "Failed to allocate devA for Matrix Matrix Multiplication" << std::endl;
+        throw std::runtime_error("Failed to allocate device memory.");
+    }
+
+    error = cudaMalloc((void**)&devB, sizeB);
+    if(error != cudaSuccess) {
+        std::cerr << "Failed to allocate devB for Matrix Matrix Multiplication" << std::endl;
+        throw std::runtime_error("Failed to allocate device memory.");
+    }
+
+    error = cudaMalloc((void**)&devC, sizeC);
+    if(error != cudaSuccess) {
+        std::cerr << "Failed to allocate devC for Matrix Matrix Multiplication" << std::endl;
+        throw std::runtime_error("Failed to allocate device memory.");
+    }
+
+    error = cudaMemcpy(devA, this->getData(), sizeA, cudaMemcpyHostToDevice);
+    if(error != cudaSuccess) {
+        std::cerr << "Failed to copy Matrix A from host to device" << std::endl;
+        throw std::runtime_error("Failed to copy host to device memory.");
+    }
+
+    error = cudaMemcpy(devB, hostB.getData(), sizeB, cudaMemcpyHostToDevice);
+    if(error != cudaSuccess) {
+        std::cerr << "Failed to copy Matrix B from host to device" << std::endl;
+        throw std::runtime_error("Failed to copy host to device memory.");
+    }
+
+    dim3 threadsPerBlock(16, 16);
+    dim3 numBlocks((hostC.getCols()+threadsPerBlock.x-1)/threadsPerBlock.x, (hostC.getRows()+threadsPerBlock.y-1)/threadsPerBlock.y);
+
+    matmatMulKernel<<<numBlocks, threadsPerBlock>>>(devA, devB, devC, this->getRows(), this->getCols(), hostB.getCols());
+
+    error = cudaMemcpy(hostC.getData(), devC, sizeC, cudaMemcpyDeviceToHost);
+    if(error != cudaSuccess) {
+        std::cerr << "Failed to copy Matrix C from device to host" << std::endl;
+        throw std::runtime_error("Failed to copy device to host memory.");
+    }
+
+    cudaFree(devA);
+    cudaFree(devB);
+    cudaFree(devC);
+
+    return hostC;
+}
+
+template<typename T>
+__global__ void matmatMulKernel(T* devA, T* devB, T* devC, int rowsA, int colsrowsAB, int colsB) {
+    int row = (blockIdx.y*blockDim.y) + threadIdx.y;
+    int col = (blockIdx.x*blockDim.x) + threadIdx.x;
+    if(row < rowsA && col < colsB) {
+        T accum = 0;
+        for(int i = 0; i < colsrowsAB; i++) {
+            accum += devA[(row*colsrowsAB)+i] * devB[(i*colsB)+col];
+        }
+        int indexC = (row*colsB) + col;
+        devC[indexC] = accum;
+    }
 }
