@@ -21,12 +21,13 @@ namespace MyLA {
         __global__ void cudaOuterProduct(const T* devA, const T* devB, T* devC, int sizeA, int sizeB);
 
         template<typename T>
-        __global__ void cudaL2Norm(const T* devA, T* partialResult, int size);
+        __global__ void cudaL2Norm(const T* devA, T* devPartialResult, int size);
 
         template<typename T>
         __global__ void cudaTranspose(const T* devA, T* devB, int size);
 
-
+        template<typename T>
+        __global__ void cudaScaleVector(const T scalar, const T* devA, T* devB, int size);
 
         template <typename T, int SIZE>
             requires std::is_arithmetic<T>::value
@@ -52,16 +53,16 @@ namespace MyLA {
             }
 
             // Vector operations
+            T l2Norm() const;
+            Matrix<T, 1, SIZE> transpose() const;
             template<int B_SIZE>
             Vector<T, SIZE> operator+(const Vector<T, B_SIZE>& hostB) const;
             T dotProduct(const Vector<T, B_SIZE>& hostB) const;
             Matrix<T, SIZE, B_SIZE> outerProduct(const Vector<T, B_SIZE>& hostB) const;
-            T l2Norm() const;
-            Matrix<T, 1, SIZE> transpose() const;
         };
 
         template<typename T, int SIZE>
-        Vector<T, SIZE> operator*(T scalar, const Vector<T, SIZE>& hostB);
+        Vector<T, SIZE> operator*(T scalar, const Vector<T, SIZE>& hostA);
 
 
     } // namespace Static
